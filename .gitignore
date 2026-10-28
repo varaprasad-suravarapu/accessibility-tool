@@ -26,3 +26,7 @@ db.sqlite3
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local development notes and credentials
+db-account-details.txt
+development-info.txt

@@ -1,10 +1,12 @@
-import {useState, type FormEvent} from "react"
+import {useEffect, useState, type FormEvent} from "react"
 import {ArrowRight, ScanSearch, ShieldCheck} from "lucide-react"
 import {useNavigate} from "react-router-dom"
 
 import Button from "../../components/ui/Button"
 import Input from "../../components/ui/Input"
 import Card from "../../components/ui/Card"
+import { checkApiHealth } from "../../services/healthService"
+import { validateURL } from "../../services/urlService"
 
 function Home() {
   const navigate = useNavigate()
@@ -13,9 +15,12 @@ function Home() {
   const [error, setError] = useState("")
   const [status, setStatus] = useState("")
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
+    setError("")
     setStatus("")
 
     const trimmedUrl = url.trim()
@@ -42,10 +47,36 @@ function Home() {
       return
     }
 
-    setError("")
-    navigate("/scan-progress", {
-      state: {url: parsedUrl.href},
+    setIsSubmitting(true)
+
+    try {
+      const result = await validateURL(parsedUrl.href)
+      console.log(result)
+
+      navigate("/scan-progress", {
+      state: {url: result.url},
     })
+
+    } catch (err) {
+      const message =
+      typeof err === "object" &&
+      err !== null &&
+      "response" in err &&
+      typeof err.response === "object" &&
+      err.response !== null &&
+      "data" in err.response &&
+      typeof err.response.data === "object" &&
+      err.response.data !== null &&
+      "message" in err.response.data &&
+      typeof err.response.data.message === "string"
+        ? err.response.data.message
+        : "Unable to validate the website. Check your connection and try again."
+
+    setError(message)
+    } finally {
+    setIsSubmitting(false)
+  }
+
     setStatus(
       "The URL is valid. Accessibility scanning will be available when the scanner is connected.",
     )
@@ -53,6 +84,16 @@ function Home() {
     // Temporary: the backend scanner will be connected later.
     console.log("URL submitted for scanning:", parsedUrl.href)
   }
+
+useEffect(() => {
+  checkApiHealth()
+    .then((data) => {
+      console.log("Backend response:", data);
+    })
+    .catch((error) => {
+      console.error("Backend connection failed:", error);
+    });
+}, []);
 
   return (
     <main className="flex min-h-screen flex-col bg-surface-subtle">
@@ -109,9 +150,9 @@ function Home() {
                 required
               />
 
-              <Button type="submit" className="mt-5 w-full sm:w-auto">
-                Check Accessibility
-                <ArrowRight size={18} aria-hidden="true" />
+              <Button type="submit" className="mt-5 w-full sm:w-auto" disabled={isSubmitting}>
+                {isSubmitting ? "Validating URL..." : "Check Accessibility"}
+                {!isSubmitting && <ArrowRight size={18} aria-hidden="true" />}
               </Button>
             </form>
 
